@@ -19,7 +19,7 @@ public class ArtnetNetwork(IPAddress address, IPAddress subnet, IPAddress broadc
     /// Artnet subnet mask, typically 255.0.0.0
     /// </summary>
     public IPAddress Mask => mask;
-    
+
     /// <summary>
     /// The subnet prefix, typically 2.0.0.0 or 10.0.0.0
     /// </summary>
@@ -35,4 +35,8 @@ public class ArtnetNetwork(IPAddress address, IPAddress subnet, IPAddress broadc
     /// </summary>
     public ushort Port => port;
     public override string ToString() => $"{address}:{port}/{mask}/{broadcast}";
+    /// <summary>
+    /// Broadcast binding address differs between windows and linux.
+    /// </summary>
+    public IPAddress Binding { get; } = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? address : broadcast;
 }

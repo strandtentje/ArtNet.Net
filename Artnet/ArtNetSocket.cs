@@ -64,7 +64,7 @@ public class ArtNetSocket(
             {
                 try
                 {
-                    IPEndPoint ipEndPoint = new IPEndPoint(artnetNetwork.Broadcast, artnetNetwork.Port);
+                    IPEndPoint ipEndPoint = new IPEndPoint(artnetNetwork.Binding, artnetNetwork.Port);
                     Bind(ipEndPoint);
                     messages.IngestMessage($"Bound to {ipEndPoint}");
                     bound = true;
