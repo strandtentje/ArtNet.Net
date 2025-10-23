@@ -8,7 +8,7 @@ namespace Artnet.Models;
 /// <param name="broadcast">Broadcast Address</param>
 /// <param name="mask">Subnet mask</param>
 /// <param name="port">Artnet Port number, typically 6454</param>
-public class ArtnetNetwork(IPAddress address, IPAddress broadcast, IPAddress mask, ushort port)
+public class ArtnetNetwork(IPAddress address, IPAddress subnet, IPAddress broadcast, IPAddress mask, ushort port)
 {
     /// <summary>
     /// Artnet IP address, typically in the 2.x.x.x or 10.x.x.x range.
@@ -19,6 +19,11 @@ public class ArtnetNetwork(IPAddress address, IPAddress broadcast, IPAddress mas
     /// Artnet subnet mask, typically 255.0.0.0
     /// </summary>
     public IPAddress Mask => mask;
+    
+    /// <summary>
+    /// The subnet prefix, typically 2.0.0.0 or 10.0.0.0
+    /// </summary>
+    public IPAddress Subnet => subnet;
 
     /// <summary>
     /// Broadcast address, typically 2.255.255.255 or 10.255.255.255

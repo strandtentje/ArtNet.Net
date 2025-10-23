@@ -20,9 +20,10 @@ public class ArtNetSocket(
     ArtnetNetworkCollection networks,
     IUniverseSink universes,
     Distributor<DatagramReceiveBuffer> receiveBuffers,
+    IMessageSink messages,
     IErrorSink errorSink,
     ObjectPool<byte[]> sendBufferPool)
-    : Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)
+    : Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp), IArtnetTransmitter, IArtnetReceiver
 {
     /// <summary>
     /// When a Poll datagram was received on any ArtNet Network
@@ -41,25 +42,59 @@ public class ArtNetSocket(
     /// its implementing instance is typically available to the DMX data consumer
     /// as IUniverseSource. 
     /// </summary>
-    public void Start()
+    public IArtnetReceiver Start()
     {
+        if (receiveBuffers.IsRunning) return this;
+
         receiveBuffers.BeforeStart += BuffersOnBeforeStart;
         receiveBuffers.ResourceAvailable += BuffersOnResourceAvailable;
+        receiveBuffers.AfterStop += OnReceiveBuffersOnAfterStop;
+
+        void OnReceiveBuffersOnAfterStop(object sender, EventArgs args)
+        {
+            receiveBuffers.ResourceAvailable -= BuffersOnResourceAvailable;
+            receiveBuffers.AfterStop -= OnReceiveBuffersOnAfterStop;
+        }
 
         void BuffersOnBeforeStart(object sender, EventArgs e)
         {
             SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            bool bound = false;
             foreach (ArtnetNetwork artnetNetwork in networks)
-                Bind(new IPEndPoint(artnetNetwork.Address, artnetNetwork.Port));
+            {
+                try
+                {
+                    IPEndPoint ipEndPoint = new IPEndPoint(artnetNetwork.Broadcast, artnetNetwork.Port);
+                    Bind(ipEndPoint);
+                    messages.IngestMessage($"Bound to {ipEndPoint}");
+                    bound = true;
+                    break;
+                }
+                catch (SocketException ex)
+                {
+                    errorSink.IngestError($"Failure during binding stage of {artnetNetwork}; {ex}");
+                }
+            }
+
+            if (!bound)
+                throw new InvalidOperationException(
+                    "Could not bind to any address. Check earlier messages. Is your network OK?");
             SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, 1);
             receiveBuffers.BeforeStart -= BuffersOnBeforeStart;
         }
+
+        receiveBuffers.Start();
+        return this;
     }
 
     /// <summary>
     /// Stop listening for incoming ArtNet traffic. Data may still be sent.
     /// </summary>
-    public void Stop() => receiveBuffers.Stop();
+    public void Stop()
+    {
+        if (!receiveBuffers.IsRunning)
+            receiveBuffers.Stop();
+    }
 
     /// <summary>
     /// When a receive buffer becomes available, this starts using that for receiving ArtNet data.
@@ -131,7 +166,8 @@ public class ArtNetSocket(
                     ArtnetPoll?.Invoke(this, payload[0]);
                     break;
                 case ArtNetOpCode.PollReply:
-                    ArtnetPollReply?.Invoke(this, MemoryMarshal.Read<PollReplyPacket>(payload));
+                    if (ArtnetPollReply != null)
+                        ArtnetPollReply.Invoke(this, MemoryMarshal.Read<PollReplyPacket>(payload));
                     break;
                 case ArtNetOpCode.Dmx:
                     var preamble = MemoryMarshal.Read<DmxPreamble>(payload);

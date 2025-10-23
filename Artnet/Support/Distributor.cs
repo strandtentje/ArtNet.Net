@@ -45,7 +45,10 @@ public class Distributor<TResource>(int capacity, Func<TResource> factory)
     /// to ensure auxiliary shared resources are set up and ready to work.
     /// </summary>
     public event EventHandler? BeforeStart;
-
+    /// <summary>
+    /// Right after the end, may be used to deconstruct dependent components
+    /// </summary>
+    public event EventHandler? AfterStop;
     /// <summary>
     /// Once a resource becomes available, work may be done by handlers of this
     /// event. Handlers of this Event should not block too much, and are expected to
@@ -84,10 +87,17 @@ public class Distributor<TResource>(int capacity, Func<TResource> factory)
         {
             if (!IsRunning)
                 throw new InvalidOperationException("Cannot stop twice.");
-            IsRunning = false;
-            Resources.Clear();
-            ChangeInAvailability.Set();
-            Resources.Clear();
+            try
+            {
+                IsRunning = false;
+                Resources.Clear();
+                ChangeInAvailability.Set();
+                Resources.Clear();
+            }
+            finally
+            {
+                AfterStop?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 

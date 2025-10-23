@@ -5,4 +5,5 @@ public struct LittleEndianUniverse
 {
     public byte LsbOctet;
     public byte MsbSeptet;
+    public override int GetHashCode() => LsbOctet << 8 | MsbSeptet;
 }

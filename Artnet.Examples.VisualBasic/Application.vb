@@ -1,48 +1,32 @@
-﻿Imports System.Net
-Imports Artnet.Models
-Imports Artnet.Packets
+﻿Imports Artnet.Models
+Imports System.Globalization
 
-Module Module1
+Module Program
+    Sub Main()
+        Dim dmx = UnfilteredDmxReader.CreateSource()
 
-    Public Sub Main()
+        Dim key As ConsoleKey
+        Dim universes() As LittleEndianUniverse = {}
+        Dim selectionNumber As Integer = -1
 
-        Dim artnet = New ArtNetSocket()
+        Do
+            universes = dmx.KnownUniverses.ToArray()
+            For i As Integer = 0 To universes.Length - 1
+                Console.WriteLine($"[{i}] {universes(i).LsbOctet} - {universes(i).MsbSeptet}")
+            Next
+            Integer.TryParse(Console.ReadLine(), NumberStyles.Integer, CultureInfo.InvariantCulture, selectionNumber)
+        Loop While selectionNumber < 0 OrElse selectionNumber >= universes.Length
 
-        artnet.EnableBroadcast = True
+        Dim universeNumber As LittleEndianUniverse = universes(selectionNumber)
+        Dim universe = dmx.SetUniverseSubscribed(universeNumber)
 
-        Console.WriteLine(artnet.BroadcastAddress.ToString())
-        artnet.Open(IPAddress.Parse("127.0.0.1"), IPAddress.Parse("255.255.255.0"))
-
-        Dim _dmxData As Byte() = New Byte(510) {}
-
-        AddHandler artnet.NewPacket, AddressOf ProcessPacket
-
-        Console.ReadLine()
-
+        Do
+            For i As Integer = 0 To universe.Data.Length - 1
+                If (i Mod 16) = 0 Then
+                    Console.WriteLine($"{i}: ")
+                End If
+                Console.Write($"{universe.Data(i)} ")
+            Next
+        Loop While Console.ReadKey().Key <> ConsoleKey.Q
     End Sub
-
-    Private _dmxData As Byte() = New Byte(510) {}
-
-    Private Sub ProcessPacket(sender As Object, e As NewPacketEventArgs(Of ArtNetPacket))
-        If (e.Packet.OpCode = ArtNetOpCode.Dmx) Then
-            Dim packet = TryCast(e.Packet, ArtNetDmxPacket)
-            Console.Clear()
-
-            If packet.DmxData Is _dmxData Then
-                Console.WriteLine("New Packet")
-                Dim i As Integer = 0
-                While i < packet.DmxData.Length
-                    If packet.DmxData(i) <> 0 Then
-                        Console.WriteLine(i + " = " + packet.DmxData(i))
-
-                    End If
-                    i = i + 1
-                End While
-
-                _dmxData = packet.DmxData
-            End If
-        End If
-
-    End Sub
-
 End Module

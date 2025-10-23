@@ -23,6 +23,6 @@ public interface IUniverseSource
     /// This doesn't need to be a KnownUniverse, but it's recommended to do incidental
     /// runtime checks if your Universe has been detected yet, and if not, maybe do a Warning 
     /// </summary>
-    /// <param name="universe">Universe number to subscribe to</param>
-    void SetUniverseSubscribed(LittleEndianUniverse universe);
+    /// <param name="universeNumber">Universe number to subscribe to</param>
+    IUniverse SetUniverseSubscribed(LittleEndianUniverse universeNumber);
 }

@@ -1,36 +1,40 @@
 ﻿using Artnet;
 using Artnet.Models;
-using Artnet.Packets;
-using System.Net;
+using System.Globalization;
 
-byte[] dmxData = new byte[511];
-var artnet = new ArtNetSocket();
-artnet.EnableBroadcast = true;
+// This happens to be the subnet in the testing subnet in which the lighting controller lives
+// It isn't directed at 10.x or 2.x in particular, instead yelling into the 255.255.255.255
+// And hoping we're listening.
+var dmx = UnfilteredDmxReader.CreateSource(@"^192\.168\.112");
 
-Console.WriteLine(artnet.BroadcastAddress.ToString());
-artnet.Open(IPAddress.Parse("127.0.0.1"), IPAddress.Parse("255.255.255.0"));
+ConsoleKey key;
 
-artnet.NewPacket += (sender, e) =>
+LittleEndianUniverse[] universes = [];
+int selectionNumber = -1;
+int i = 0;
+do
 {
-    if (e.Packet.OpCode == ArtNetOpCode.Dmx)
+    universes = dmx.KnownUniverses.ToArray();
+    for (i = 0; i < universes.Length; i++)
+        Console.WriteLine($"[{i}] {universes[i].LsbOctet} - {universes[i].MsbSeptet}");
+    if (i == 0)
+        Console.WriteLine("No universes. Press enter to query again.");
+    int.TryParse(Console.ReadLine(), CultureInfo.InvariantCulture, out selectionNumber);
+} while (selectionNumber < 0 || selectionNumber >= universes.Length);
+
+LittleEndianUniverse universeNumber = universes[selectionNumber];
+var universe = dmx.SetUniverseSubscribed(universeNumber);
+
+do
+{
+    for (i = 0; i < universe.Data.Length; i++)
     {
-        var packet = e.Packet as ArtNetDmxPacket;
-        Console.Clear();
-
-        if (packet.DmxData != dmxData)
+        if ((i % 16) == 0)
         {
-            Console.WriteLine("New Packet");
-            for (var i = 0; i < packet.DmxData.Length; i++)
-            {
-                if (packet.DmxData[i] != 0)
-                    Console.WriteLine(i + " = " + packet.DmxData[i]);
-            }
-
-            ;
-
-            dmxData = packet.DmxData;
+            Console.WriteLine($"{i}: ");
         }
+        Console.Write($"{universe.Data[i]} ");
     }
-};
+} while (Console.ReadKey().Key != ConsoleKey.Q);
 
-Console.ReadLine();
+

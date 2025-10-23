@@ -11,9 +11,14 @@ public static class UnfilteredDmxReader
     /// reasonable way that's light on resources, and outputs an IUniverseSource which can be used to
     /// read out DMX universes.
     /// </summary>
+    /// <param name="subnetPattern">Pattern of the preferred subnet; will bind to the best option.</param>
     /// <param name="dumpInterval">Diagnostic dump interval (defaults to 10 seconds)</param>
     /// <returns></returns>
-    public static IUniverseSource CreateSource(int dumpInterval = 10000) =>
-        (new ServiceCollection()).AddArtnetLogToConsole(dumpInterval).BuildServiceProvider()
-        .GetRequiredService<IUniverseSource>();
+    public static IUniverseSource CreateSource(string subnetPattern = "^10\\.", int dumpInterval = 10000)
+    {
+        var services = (new ServiceCollection()).AddArtnetLogToConsole(subnetPattern).BuildServiceProvider();
+        services.GetRequiredService<IPeriodicInspector>().Start(dumpInterval);
+        services.GetRequiredService<IArtnetReceiver>().Start();
+        return services.GetRequiredService<IUniverseSource>();
+    }
 }

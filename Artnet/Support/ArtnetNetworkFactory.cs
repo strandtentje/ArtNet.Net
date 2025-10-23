@@ -1,5 +1,8 @@
 // ReSharper disable MemberCanBePrivate.Global
 // ReSharper disable UnusedMember.Global
+
+using System.Text.RegularExpressions;
+
 namespace Artnet.Models;
 
 /// <summary>
@@ -13,7 +16,7 @@ public class ArtnetNetworkFactory(IMessageSink messages)
     /// Setup an Artnet Network for each detected NIC with an IPv4 address
     /// </summary>
     /// <returns>An artnet Network for each nic that's up</returns>
-    public ArtnetNetworkCollection CollectionFromPhysical()
+    public ArtnetNetworkCollection CollectionFromPhysical(string preferredSubnet)
     {
         NetworkInterface[] allNetworkInterfaces = NetworkInterface.GetAllNetworkInterfaces();
         messages.IngestMessage($"Detected {allNetworkInterfaces.Length} network interfaces");
@@ -27,11 +30,17 @@ public class ArtnetNetworkFactory(IMessageSink messages)
         UnicastIPAddressInformation[] unicastAddresses =
             [..wakingInterfaces.SelectMany(x => x.GetIPProperties().UnicastAddresses)];
         ArtnetNetwork[] result =
-            [..unicastAddresses.Select(FromPhysical).ToArray()];
+        [
+            ..unicastAddresses
+                .Where(x => x.Address.AddressFamily == AddressFamily.InterNetwork)
+                .Select(FromPhysical)
+                .OrderByDescending(x => Regex.IsMatch(x.Address.ToString(), preferredSubnet)).ToArray()
+        ];
         foreach (ArtnetNetwork artnetNetwork in result)
-            messages.IngestMessage($"ArtNet binding to: {artnetNetwork}");
+            messages.IngestMessage($"Potential ArtNet interface: {artnetNetwork}");
         return result;
     }
+
     /// <summary>
     /// When using an IP address from the "Standard" artnet range.
     /// </summary>
@@ -42,12 +51,15 @@ public class ArtnetNetworkFactory(IMessageSink messages)
     {
         var addressBytes = standardAddress.GetAddressBytes();
         if (addressBytes.ElementAtOrDefault(0) == 2)
-            return new(standardAddress, IPAddress.Parse("2.255.255.255"), IPAddress.Parse("255.0.0.0"), 6454);
+            return new(standardAddress, IPAddress.Parse("2.0.0.0"), IPAddress.Parse("2.255.255.255"),
+                IPAddress.Parse("255.0.0.0"), 6454);
         else if (addressBytes.ElementAtOrDefault(0) == 10)
-            return new(standardAddress, IPAddress.Parse("10.255.255.255"), IPAddress.Parse("255.0.0.0"), 6454);
+            return new(standardAddress, IPAddress.Parse("10.0.0.0"), IPAddress.Parse("10.255.255.255"),
+                IPAddress.Parse("255.0.0.0"), 6454);
         else
             throw new ArgumentException("Standard ArtNet IP ranges are 10.x.x.x or 2.x.x.x", nameof(standardAddress));
     }
+
     /// <summary>
     /// When using a non-standard IP-range for artnet, use this factory method.
     /// Supply IP address and subnet size.
@@ -63,17 +75,23 @@ public class ArtnetNetworkFactory(IMessageSink messages)
         {
             case SubnetSize.By8:
                 var by8Broadcast = new IPAddress([addressBytes[0], addressBytes[1], addressBytes[2], 0xFF]);
-                return new ArtnetNetwork(customAddress, by8Broadcast, IPAddress.Parse("255.255.255.0"), 6454);
+                var by8Subnet = new IPAddress([addressBytes[0], addressBytes[1], addressBytes[2], 0x00]);
+                return new ArtnetNetwork(customAddress, by8Subnet, by8Broadcast, IPAddress.Parse("255.255.255.0"),
+                    6454);
             case SubnetSize.By16:
                 var by16Broadcast = new IPAddress([addressBytes[0], addressBytes[1], 0xFF, 0xFF]);
-                return new ArtnetNetwork(customAddress, by16Broadcast, IPAddress.Parse("255.255.0.0"), 6454);
+                var by16Subnet = new IPAddress([addressBytes[0], addressBytes[1], 0x00, 0x00]);
+                return new ArtnetNetwork(customAddress, by16Subnet, by16Broadcast, IPAddress.Parse("255.255.0.0"),
+                    6454);
             case SubnetSize.By24:
                 var by24Broadcast = new IPAddress([addressBytes[0], 0xFF, 0xFF, 0xFF]);
-                return new ArtnetNetwork(customAddress, by24Broadcast, IPAddress.Parse("255.0.0.0"), 6454);
+                var by24Subnet = new IPAddress([addressBytes[0], 0x00, 0x00, 0x00]);
+                return new ArtnetNetwork(customAddress, by24Subnet, by24Broadcast, IPAddress.Parse("255.0.0.0"), 6454);
             default:
                 throw new ArgumentException("Unknown Subnet Size", nameof(size));
         }
     }
+
     /// <summary>
     /// Setup an Artnet Network provided Unicast IP address info (the stuff you get from DHCP or enter manually in the 3 boxes)
     /// </summary>
@@ -85,6 +103,7 @@ public class ArtnetNetworkFactory(IMessageSink messages)
         var ipRange = arg.Address.GetAddressBytes()
             .Zip(maskBytes, (address, mask) => address & mask);
         var broadcast = ipRange.Zip(maskBytes, (range, mask) => (byte)(range | ~mask)).ToArray();
-        return new(arg.Address, new IPAddress(broadcast), arg.IPv4Mask, 6454);
+        return new(arg.Address, new IPAddress(ipRange.Select(x => (byte)x).ToArray()), new IPAddress(broadcast),
+            arg.IPv4Mask, 6454);
     }
 }

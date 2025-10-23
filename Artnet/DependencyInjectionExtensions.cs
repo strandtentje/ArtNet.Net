@@ -9,46 +9,53 @@ public static class DependencyInjectionExtensions
     /// </summary>
     /// <param name="services">Existing ServiceCollection</param>
     /// <param name="logger">Implementation to receive our information and error messages</param>
-    /// <param name="universeDumpInterval">Diagnostic Universe Dump Interval in milliseconds. Set to Int32.MaxValue to not fire.</param>
+    /// <param name="preferredSubnet">Provide pattern of the preferred subnet here ie. ^192\.168\.1 or ^10\.</param>
     /// <typeparam name="TLogger"></typeparam>
     /// <returns>The modified service collection</returns>
     public static IServiceCollection AddArtnetWithSaneDefaults<TLogger>(
-        this IServiceCollection services, TLogger logger, int universeDumpInterval = int.MaxValue)
+        this IServiceCollection services, string preferredSubnet, TLogger logger)
         where TLogger : IErrorSink, IMessageSink =>
         services
             .AddSingleton<IMessageSink>(logger)
             .AddSingleton<ArtnetNetworkFactory>()
             .AddSingleton<ArtnetNetworkCollection>(x =>
-                x.GetRequiredService<ArtnetNetworkFactory>().CollectionFromPhysical())
+                x.GetRequiredService<ArtnetNetworkFactory>().CollectionFromPhysical(preferredSubnet))
             .AddSingleton<DmxUniverseRepository>()
             .AddSingleton<IUniverseSink>(x => x.GetRequiredService<DmxUniverseRepository>())
             .AddSingleton<IUniverseSource>(x => x.GetRequiredService<DmxUniverseRepository>())
-            .AddSingleton(CreateDistributor)
+            .AddSingleton(CreateDistributor())
             .AddSingleton<IErrorSink>(logger)
-            .AddSingleton(CreateTransmitBufferPool)
+            .AddSingleton(CreateTransmitBufferPool())
             .AddSingleton<RecurringUniverseInspection>()
             .AddSingleton<IPeriodicInspector>(x =>
-                x.GetRequiredService<RecurringUniverseInspection>().Start(universeDumpInterval));
+                x.GetRequiredService<RecurringUniverseInspection>())
+            .AddSingleton<ArtNetSocket>()
+            .AddSingleton<IArtnetTransmitter>(x => x.GetRequiredService<ArtNetSocket>())
+            .AddSingleton<IArtnetReceiver>(x => x.GetRequiredService<ArtNetSocket>());
+
     /// <summary>
     /// Works like `AddArtnetWithSaneDefaults`, except immediately puts messages and errors into Console,
     /// instead of some other place.
     /// </summary>
     /// <param name="services">Service collection to modify</param>
-    /// <param name="dumpInterval">Diagnostic reporting interval</param>
+    /// <param name="preferredSubnet">Preferred subnet pattern ie ^192\.168\.1 or ^10\.</param>
     /// <returns></returns>
-    public static IServiceCollection AddArtnetLogToConsole(this IServiceCollection services, int dumpInterval) =>
-        services.AddArtnetWithSaneDefaults(ConsoleWritingMessageSink.StartNew(), dumpInterval);
+    public static IServiceCollection AddArtnetLogToConsole(this IServiceCollection services, string preferredSubnet) =>
+        services.AddArtnetWithSaneDefaults(preferredSubnet, ConsoleWritingMessageSink.StartNew());
+
     /// <summary>
     /// Default Transmit buffer pool; makes 1500-byte transmit buffers and clears them on return.
     /// </summary>
     /// <returns></returns>
     private static ObjectPool<byte[]> CreateTransmitBufferPool() =>
         new DefaultObjectPool<byte[]>(new TransmitBufferPoolPolicy());
+
     /// <summary>
     /// Creates a new Distributor with 8 allocated resources for receive buffer
     /// </summary>
     /// <returns>Distributor ready for injection</returns>
     private static Distributor<DatagramReceiveBuffer> CreateDistributor() => new(8, CreateReceiveBuffer);
+
     /// <summary>
     /// Creates a Receive buffer suitable for most ArtNet payloads.
     /// </summary>
