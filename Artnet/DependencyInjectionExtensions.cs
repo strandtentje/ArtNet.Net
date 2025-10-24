@@ -47,14 +47,14 @@ public static class DependencyInjectionExtensions
     /// Default Transmit buffer pool; makes 1500-byte transmit buffers and clears them on return.
     /// </summary>
     /// <returns></returns>
-    private static ObjectPool<byte[]> CreateTransmitBufferPool() =>
+    public static ObjectPool<byte[]> CreateTransmitBufferPool() =>
         new DefaultObjectPool<byte[]>(new TransmitBufferPoolPolicy());
 
     /// <summary>
     /// Creates a new Distributor with 8 allocated resources for receive buffer
     /// </summary>
     /// <returns>Distributor ready for injection</returns>
-    private static Distributor<DatagramReceiveBuffer> CreateDistributor() => new(8, CreateReceiveBuffer);
+    public static Distributor<DatagramReceiveBuffer> CreateDistributor() => new(8, CreateReceiveBuffer);
 
     /// <summary>
     /// Creates a Receive buffer suitable for most ArtNet payloads.
