@@ -19,4 +19,15 @@ public struct BigEndianUShort
     /// Turn the current value into a regular ushort suitable for use on the current platform.
     /// </summary>
     public ushort Value => (ushort)(MSB << 8 | LSB);
+
+    public static BigEndianUShort FromUShort(ushort val)
+    {
+        byte msb = (byte)((val >> 8) & 0b1111_1111);
+        byte lsb = (byte)(val & 0b1111_1111);
+        return new BigEndianUShort()
+        {
+            MSB = msb,
+            LSB = lsb
+        };
+    }
 }

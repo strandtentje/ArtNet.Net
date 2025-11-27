@@ -96,7 +96,8 @@ public static class ArtnetProtocolExtensions
     /// <returns>Transmission length as written to the allocation. We start writing at 0</returns>
     /// <exception cref="ArgumentException">In case the OpCode could not be sent</exception>
     /// <exception cref="ArgumentOutOfRangeException">In case the supplied byte array was not big enough.</exception>
-    public static int BuildProtocol<TPayload>(this ArtNetOpCode opCode, TPayload payload, byte[] allocation) where TPayload : struct
+    public static int BuildProtocol<TPayload>(
+        this ArtNetOpCode opCode, TPayload payload, byte[] allocation) where TPayload : struct
     {
         int packetSize = 0;
         if (opCode == ArtNetOpCode.PollReply)

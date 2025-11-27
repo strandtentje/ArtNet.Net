@@ -193,12 +193,19 @@ public class ArtNetSocket(
     /// <param name="opcode">Opcode to include in the header. Make sure this matches the remaining packet</param>
     /// <param name="packet">Packet struct to send on the ArtNet network.</param>
     /// <typeparam name="TPacket">A struct that is to be turned into a bunch of bytes sequentially.</typeparam>
-    public void Send<TPacket>(ArtNetOpCode opcode, TPacket packet) where TPacket : struct
+    public void Send<TPacket>(ArtNetOpCode opcode, TPacket packet, byte[]? tail = null) where TPacket : struct
     {
         var sendBuffer = sendBufferPool.Get();
         try
         {
             var sendSize = opcode.BuildProtocol(packet, sendBuffer);
+
+            if (tail != null && opcode == ArtNetOpCode.Dmx && packet is DmxPreamble preamble)
+            {
+                Array.Copy(tail, 0, sendBuffer, sendSize, tail.Length);
+                sendSize += preamble.DmxLength.Value;
+            }
+
             foreach (var broadcastEndpoint in networks.BroadcastEndpoints)
                 SendTo(sendBuffer, 0, sendSize, SocketFlags.Broadcast, broadcastEndpoint);
         }
