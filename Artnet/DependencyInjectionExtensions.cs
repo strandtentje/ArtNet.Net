@@ -23,7 +23,7 @@ public static class DependencyInjectionExtensions
             .AddSingleton<DmxUniverseRepository>()
             .AddSingleton<IUniverseSink>(x => x.GetRequiredService<DmxUniverseRepository>())
             .AddSingleton<IUniverseSource>(x => x.GetRequiredService<DmxUniverseRepository>())
-            .AddSingleton(CreateDistributor())
+            .AddSingleton(CreateReceiveBufferDistributor())
             .AddSingleton<IErrorSink>(logger)
             .AddSingleton(CreateTransmitBufferPool())
             .AddSingleton<RecurringUniverseInspection>()
@@ -54,7 +54,7 @@ public static class DependencyInjectionExtensions
     /// Creates a new Distributor with 8 allocated resources for receive buffer
     /// </summary>
     /// <returns>Distributor ready for injection</returns>
-    public static Distributor<DatagramReceiveBuffer> CreateDistributor() => new(8, CreateReceiveBuffer);
+    public static Distributor<DatagramReceiveBuffer> CreateReceiveBufferDistributor() => new(2, CreateReceiveBuffer);
 
     /// <summary>
     /// Creates a Receive buffer suitable for most ArtNet payloads.

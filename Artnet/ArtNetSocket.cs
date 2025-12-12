@@ -108,7 +108,7 @@ public class ArtNetSocket(
     {
         e.Reset(networks.CommonPort);
         try
-        {
+        {            
             BeginReceiveFrom(e.Data, 0, e.Data.Length, SocketFlags.None, ref e.LocalEndpoint,
                 ReceivingDatagram, e);
         }
@@ -148,6 +148,7 @@ public class ArtNetSocket(
 
             try
             {
+                buffer.LocalEndpoint = this.LocalEndPoint;
                 buffer.Length = EndReceiveFrom(ar, ref buffer.RemoteEndpoint);
             }
             catch (SocketException ex)
